@@ -70,6 +70,7 @@ def trainer_synapse(args, model, snapshot_path):
     model.train()
     ce_loss = CrossEntropyLoss()
     dice_loss = DiceLoss(num_classes)
+
     optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
     writer = SummaryWriter(snapshot_path + '/log')
     iter_num = 0
@@ -79,7 +80,7 @@ def trainer_synapse(args, model, snapshot_path):
     best_performance = 0.0
     iterator = tqdm(range(max_epoch), ncols=70)
 
-    for epoch_num in iterator:
+    for epoch_num in tqdm(iterator):
         for i_batch, sampled_batch in enumerate(train_loader):
             image_batch, label_batch = sampled_batch['image'], sampled_batch['mask']
             image_batch, label_batch = image_batch.cuda().float(), label_batch.cuda().float()
@@ -90,6 +91,11 @@ def trainer_synapse(args, model, snapshot_path):
             # loss_dice = dice_loss(outputs, label_batch, softmax=True)
 
             outputs = F.softmax(outputs, dim=1)
+
+            if iter_num % 100 == 0:
+                print("=======")
+                logging.info('ivh : %f / ich : %f' % (outputs[:,1,:,:].max(),outputs[:,2,:,:].max()))
+
             dice_loss1 = dice_coeff(outputs[:, 1, :, :], label_batch[:, :, :, :])
             dice_loss2 = dice_coeff(outputs[:, 2, :, :], label_batch[:, :, :, :])
             bce_dice_loss = (dice_loss1 + dice_loss2) / 2
@@ -108,7 +114,8 @@ def trainer_synapse(args, model, snapshot_path):
             # writer.add_scalar('info/loss_ce', loss_ce, iter_num)
 
             # logging.info('iteration %d : loss : %f, loss_ce: %f' % (iter_num, loss.item(), loss_ce.item()))
-            logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
+            # logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
+
 
             # if iter_num % 20 == 0:
             #     image = image_batch[1, 0:1, :, :]
@@ -121,9 +128,10 @@ def trainer_synapse(args, model, snapshot_path):
 
         save_interval = 50  # int(max_epoch/6)
         # if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
-        save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
-        torch.save(model.state_dict(), save_mode_path)
-        logging.info("save model to {}".format(save_mode_path))
+        if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
+            save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
+            torch.save(model.state_dict(), save_mode_path)
+            logging.info("save model to {}".format(save_mode_path))
 
         if epoch_num >= max_epoch - 1:
             save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')

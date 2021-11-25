@@ -29,6 +29,8 @@ import glob
 from utils2.dataset import BasicDataset
 from torch.utils.data import random_split
 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
                     default='../data/Synapse/train_npz', help='root dir for data')
@@ -41,9 +43,9 @@ parser.add_argument('--num_classes', type=int,
 parser.add_argument('--max_iterations', type=int,
                     default=30000, help='maximum epoch number to train')
 parser.add_argument('--max_epochs', type=int,
-                    default=100, help='maximum epoch number to train')
+                    default=10, help='maximum epoch number to train')
 parser.add_argument('--batch_size', type=int,
-                    default=1, help='batch_size per gpu')
+                    default=7, help='batch_size per gpu')
 parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
 parser.add_argument('--deterministic', type=int,  default=1,
                     help='whether use deterministic training')
@@ -108,8 +110,11 @@ if __name__ == "__main__":
 
     if args.vit_name.find('R50') != -1:
         config_vit.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
+
     net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
+
     net.load_from(weights=np.load(config_vit.pretrained_path))
+    # net = nn.DataParallel(net)
 
     trainer = {'Synapse': trainer_synapse,}
     trainer[dataset_name](args, net, snapshot_path)
