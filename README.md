@@ -1,46 +1,50 @@
-# Swin-Unet
-The codes for the work "Swin-Unet: Unet-like Pure Transformer for Medical Image Segmentation"(https://arxiv.org/abs/2105.05537). A validation for U-shaped Swin Transformer.
+# TransUNet
+This repo holds code for [TransUNet: Transformers Make Strong Encoders for Medical Image Segmentation](https://arxiv.org/pdf/2102.04306.pdf)
 
-## 1. Download pre-trained swin transformer model (Swin-T)
-* [Get pre-trained model in this link] (https://drive.google.com/drive/folders/1UC3XOoezeum0uck4KBVGa8osahs6rKUY?usp=sharing): Put pretrained Swin-T into folder "pretrained_ckpt/"
+## Usage
 
-## 2. Prepare data
-
-- The datasets we used are provided by TransUnet's authors. Please go to ["./datasets/README.md"](datasets/README.md) for details, or please send an Email to jienengchen01 AT gmail.com to request the preprocessed data. If you would like to use the preprocessed data, please use it for research purposes and do not redistribute it (following the TransUnet's License).
-
-## 3. Environment
-
-- Please prepare an environment with python=3.7, and then use the command "pip install -r requirements.txt" for the dependencies.
-
-## 4. Train/Test
-
-- Run the train script on synapse dataset. The batch size we used is 24. If you do not have enough GPU memory, the bacth size can be reduced to 12 or 6 to save memory.
-
-- Train
-
+### 1. Download Google pre-trained ViT models
+* [Get models in this link](https://console.cloud.google.com/storage/vit_models/): R50-ViT-B_16, ViT-B_16, ViT-L_16...
 ```bash
-sh train.sh or python train.py --dataset Synapse --cfg configs/swin_tiny_patch4_window7_224_lite.yaml --root_path your DATA_DIR --max_epochs 150 --output_dir your OUT_DIR  --img_size 224 --base_lr 0.05 --batch_size 24
+wget https://storage.googleapis.com/vit_models/imagenet21k/{MODEL_NAME}.npz &&
+mkdir ../model/vit_checkpoint/imagenet21k &&
+mv {MODEL_NAME}.npz ../model/vit_checkpoint/imagenet21k/{MODEL_NAME}.npz
 ```
 
-- Test 
+### 2. Prepare data
+
+Please go to ["./datasets/README.md"](datasets/README.md) for details, or please send an Email to jienengchen01 AT gmail.com to request the preprocessed data. If you would like to use the preprocessed data, please use it for research purposes and do not redistribute it.
+
+### 3. Environment
+
+Please prepare an environment with python=3.7, and then use the command "pip install -r requirements.txt" for the dependencies.
+
+### 4. Train/Test
+
+- Run the train script on synapse dataset. The batch size can be reduced to 12 or 6 to save memory (please also decrease the base_lr linearly), and both can reach similar performance.
 
 ```bash
-sh test.sh or python test.py --dataset Synapse --cfg configs/swin_tiny_patch4_window7_224_lite.yaml --is_saveni --volume_path your DATA_DIR --output_dir your OUT_DIR --max_epoch 150 --base_lr 0.05 --img_size 224 --batch_size 24
+CUDA_VISIBLE_DEVICES=0 python train.py --dataset Synapse --vit_name R50-ViT-B_16
 ```
 
-## References
-* [TransUnet](https://github.com/Beckschen/TransUNet)
-* [SwinTransformer](https://github.com/microsoft/Swin-Transformer)
+- Run the test script on synapse dataset. It supports testing for both 2D images and 3D volumes.
 
-## Citation
+```bash
+python test.py --dataset Synapse --vit_name R50-ViT-B_16
+```
+
+## Reference
+* [Google ViT](https://github.com/google-research/vision_transformer)
+* [ViT-pytorch](https://github.com/jeonsworld/ViT-pytorch)
+* [segmentation_models.pytorch](https://github.com/qubvel/segmentation_models.pytorch)
+
+## Citations
 
 ```bibtex
-@misc{cao2021swinunet,
-      title={Swin-Unet: Unet-like Pure Transformer for Medical Image Segmentation}, 
-      author={Hu Cao and Yueyue Wang and Joy Chen and Dongsheng Jiang and Xiaopeng Zhang and Qi Tian and Manning Wang},
-      year={2021},
-      eprint={2105.05537},
-      archivePrefix={arXiv},
-      primaryClass={eess.IV}
+@article{chen2021transunet,
+  title={TransUNet: Transformers Make Strong Encoders for Medical Image Segmentation},
+  author={Chen, Jieneng and Lu, Yongyi and Yu, Qihang and Luo, Xiangde and Adeli, Ehsan and Wang, Yan and Lu, Le and Yuille, Alan L., and Zhou, Yuyin},
+  journal={arXiv preprint arXiv:2102.04306},
+  year={2021}
 }
 ```
