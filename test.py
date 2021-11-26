@@ -129,7 +129,7 @@ def inference(args, model, test_save_path=None):
                 outputs = model(img2)
 
                 outputs = F.softmax(outputs, dim=1)
-                logging.info('ivh : %f / ich : %f' % (outputs[:,1,:,:].max(),outputs[:,2,:,:].max()))
+                # logging.info('ivh : %f / ich : %f' % (outputs[:,1,:,:].max(),outputs[:,2,:,:].max()))
                 outputs = outputs.squeeze(0)
 
                 tf = transforms.Compose(
@@ -144,7 +144,7 @@ def inference(args, model, test_save_path=None):
                 for prob in outputs:
                     prob = tf(prob.cpu())
                     mask = prob.squeeze().cpu().numpy()
-                    mask = mask > 1e-5 #out_threshold
+                    mask = mask > 0.45 #out_threshold
                     masks.append(mask)
 
 
@@ -388,8 +388,11 @@ if __name__ == "__main__":
 
 
     if not os.path.exists(snapshot): snapshot = snapshot.replace('best_model', 'epoch_'+str(args.max_epochs-1))
-    snapshot = './model/TU_Synapse512/TU_pretrain_R50-ViT-B_16_skip3_epo100_bs7_512/211125_epoch_99.pth'
+    # snapshot = './model/TU_Synapse512/TU_pretrain_R50-ViT-B_16_skip3_epo100_bs7_512/211125_epoch_99.pth'
+    snapshot = './model/TU_Synapse512/TU_pretrain_R50-ViT-B_16_skip3_epo50_bs7_512/epoch_best.pth'
+
     net.load_state_dict(torch.load(snapshot))
+    # net = nn.DataParallel(net)
 
     snapshot_name = snapshot_path.split('/')[-1]
 
