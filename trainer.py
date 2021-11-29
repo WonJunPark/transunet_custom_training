@@ -19,6 +19,10 @@ from utils2.dataset import BasicDataset
 from torch.utils.data import random_split
 from losses import dice_coeff
 import torch.nn.functional as F
+from losses import LovaszLossSoftmax
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
 
 def trainer_synapse(args, model, snapshot_path):
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
@@ -41,7 +45,15 @@ def trainer_synapse(args, model, snapshot_path):
     img_path_list = sorted(glob('../sample_preprocessing/data/*/*.png'))
     mask_path_list = sorted(glob('../sample_preprocessing/label/*/*.png'))
 
-    dataset = BasicDataset(img_path_list, mask_path_list)
+    train_transform = A.Compose(
+        [
+            # https://hoya012.github.io/blog/albumentation_tutorial/
+            A.Flip(p=0.5),
+            A.ShiftScaleRotate(p=0.5)
+        ]
+    )
+
+    dataset = BasicDataset(img_path_list, mask_path_list, 1, train_transform)
 
 
     val_percent = 20 / 100
@@ -98,10 +110,12 @@ def trainer_synapse(args, model, snapshot_path):
             if iter_num % 100 == 0:
                 logging.info('\nivh : %f / ich : %f' % (outputs[:,1,:,:].max(),outputs[:,2,:,:].max()))
 
+            criterion = LovaszLossSoftmax()
+            lovasz_loss = criterion(outputs, label_batch)
             dice_loss1 = dice_coeff(outputs[:, 1, :, :], label_batch[:, :, :, :])
             dice_loss2 = dice_coeff(outputs[:, 2, :, :], label_batch[:, :, :, :])
             bce_dice_loss = (dice_loss1 + dice_loss2) / 2
-            loss = bce_dice_loss
+            loss = (bce_dice_loss + lovasz_loss) / 2
 
             optimizer.zero_grad()
             loss.backward()
@@ -123,17 +137,8 @@ def trainer_synapse(args, model, snapshot_path):
         avg_loss = total_loss/len(train_loader)
         logging.info('avg loss : %f' % (avg_loss))
 
-            # if iter_num % 20 == 0:
-            #     image = image_batch[1, 0:1, :, :]
-            #     image = (image - image.min()) / (image.max() - image.min())
-            #     writer.add_image('train/Image', image, iter_num)
-            #     outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
-            #     writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
-            #     labs = label_batch[1, ...].unsqueeze(0) * 50
-            #     writer.add_image('train/GroundTruth', labs, iter_num)
 
         save_interval = 50  # int(max_epoch/6)
-        # if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
 
         if old_loss > avg_loss:
             old_loss = avg_loss
@@ -142,66 +147,11 @@ def trainer_synapse(args, model, snapshot_path):
             torch.save(model.state_dict(), save_mode_path)
             logging.info("save model to {}".format(save_mode_path))
             logging.info("save model!")
-        #
-        # if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
-        #     save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
-        #     torch.save(model.state_dict(), save_mode_path)
-        #     logging.info("save model to {}".format(save_mode_path))
-        #
-        # if epoch_num >= max_epoch - 1:
-        #     save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
-        #     torch.save(model.state_dict(), save_mode_path)
-        #     logging.info("save model to {}".format(save_mode_path))
-        #     iterator.close()
-        #     break
+
+        if epoch_num == 50-1:
+            save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
+            torch.save(model.state_dict(), save_mode_path)
+
 
     writer.close()
     return "Training Finished!"
-
-    # for epoch_num in iterator:
-    #     for i_batch, sampled_batch in enumerate(train_loader):
-    #         image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
-    #         image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
-    #
-    #         outputs = model(image_batch)
-    #         loss_ce = ce_loss(outputs, label_batch[:].long())
-    #         loss_dice = dice_loss(outputs, label_batch, softmax=True)
-    #         loss = 0.5 * loss_ce + 0.5 * loss_dice
-    #         optimizer.zero_grad()
-    #         loss.backward()
-    #         optimizer.step()
-    #         lr_ = base_lr * (1.0 - iter_num / max_iterations) ** 0.9
-    #         for param_group in optimizer.param_groups:
-    #             param_group['lr'] = lr_
-    #
-    #         iter_num = iter_num + 1
-    #         writer.add_scalar('info/lr', lr_, iter_num)
-    #         writer.add_scalar('info/total_loss', loss, iter_num)
-    #         writer.add_scalar('info/loss_ce', loss_ce, iter_num)
-    #
-    #         logging.info('iteration %d : loss : %f, loss_ce: %f' % (iter_num, loss.item(), loss_ce.item()))
-    #
-    #         if iter_num % 20 == 0:
-    #             image = image_batch[1, 0:1, :, :]
-    #             image = (image - image.min()) / (image.max() - image.min())
-    #             writer.add_image('train/Image', image, iter_num)
-    #             outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
-    #             writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
-    #             labs = label_batch[1, ...].unsqueeze(0) * 50
-    #             writer.add_image('train/GroundTruth', labs, iter_num)
-    #
-    #     save_interval = 50  # int(max_epoch/6)
-    #     if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
-    #         save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
-    #         torch.save(model.state_dict(), save_mode_path)
-    #         logging.info("save model to {}".format(save_mode_path))
-    #
-    #     if epoch_num >= max_epoch - 1:
-    #         save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
-    #         torch.save(model.state_dict(), save_mode_path)
-    #         logging.info("save model to {}".format(save_mode_path))
-    #         iterator.close()
-    #         break
-    #
-    # writer.close()
-    # return "Training Finished!"
